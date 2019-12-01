@@ -9,7 +9,14 @@ import modbus_tk.defines as cst
 class Server:
 
     class ServerError(Exception):
-        pass
+        """ Common base class for all non-exit exceptions. """
+        def __init__(self, *args, **kwargs):  # real signature unknown
+            pass
+
+        @staticmethod  # known case of __new__
+        def __new__(*args, **kwargs):  # real signature unknown
+            """ Create and return a new object.  See help(type) for accurate signature. """
+            pass
 
     def about(self):
         print("Sever 2019")
@@ -22,8 +29,15 @@ class Server:
         self.consol = {"connect": self.connect, "reset": self.reset}
         self.masters = []
 
-    def create_server(self, port, speed, ID ):
-        master = minimalmodbus.Instrument(port, ID)
+    def create_server(self, port, speed, sid):
+        """
+        Creating Modbus serer and asking devise ID
+        :param port: COM port name
+        :param speed: COM port baud rate
+        :param sid: Modbus slave address
+        :return: True if devise found
+        """
+        master = minimalmodbus.Instrument(port, sid)
         master.serial.baudrate = speed
         master.serial.bytesize = 8
         master.serial.parity = serial.PARITY_NONE
@@ -36,10 +50,16 @@ class Server:
             return False
         else:
             req=req[8:16]+req[32:40]+req[44:52]
-            self.masters.append([req, ID, speed, port])
+            self.masters.append([req, sid, speed, port])
             return True
 
     def connect(self, args):
+        """
+        Server.connect - searching devices
+
+        :param args: connect [Port Name] [Port Speed] [Device address]
+        :return: True/False
+        """
         self.masters = []
         serials = serial.tools.list_ports.comports()
         ports = [el.device for el in serials]
