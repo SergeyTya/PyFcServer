@@ -9,7 +9,7 @@ import sys  # We need sys so that we can pass argv to QApplication
 import os
 import time
 
-from PyFcServer.server import Server
+from server import Server
 
 
 class MainWindow(QtWidgets.QMainWindow):

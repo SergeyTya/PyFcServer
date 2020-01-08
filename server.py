@@ -1,9 +1,13 @@
 import sys
+import termios
 
 import serial.tools.list_ports
 import minimalmodbus
 import struct
 from collections import deque
+from datetime import time, datetime
+import copy
+import serial as serialutil
 
 
 class Server:
@@ -12,15 +16,79 @@ class Server:
 
     class Device:
 
-        def __init__(self, device):
+        def __init__(self, device, slave_name):
             self.device = device
+            self.slave_name = slave_name
             self.holdings = []
             self.inputs = []
             self.scope_maxlen = 10000
             self.scope_fifo = [deque([0] * self.scope_maxlen, maxlen=self.scope_maxlen) for i in range(4)]
             self.scope_timeline = deque([0] * self.scope_maxlen, maxlen=self.scope_maxlen)
 
+    def help(self):
+        print("connect [Port Name] [Port Speed] [Device address] [-a] \n "
+              "-a all devices, if not define function stop a first device \n")
+        print("read_scope [device ID] \n")
+        print("read  [device ID] [register number] [register type] \n")
+        print("devices \n")
+        print("rm [options] [ID]\n"
+              "-a clear list of devices, -o remove other devices ")
+
+    def rm_device(self, args):
+        """
+        rm_device [device ID] [option]
+        :param args:
+            -a all
+            -o remove all except device ID
+        :return:
+        """
+        if len(self.devices) == 0: return
+        did = 0
+        onlyotion = False
+        alloption = False
+        try:
+            did = int(args[1])
+            if did >= len(self.devices): return False
+            if did < -1: return False
+        except IndexError:
+            pass
+        except ValueError:
+            if args[1] == "-a": alloption = True
+            if args[1] == "-o": onlyotion = True
+        try:
+            if args[2] == "-a": alloption = True
+            if args[2] == "-o": onlyotion = True
+        except IndexError:
+            pass
+
+        if alloption:
+            self.devices.clear()
+            return True
+        if onlyotion:
+            tmp = self.devices[did]
+            self.devices.clear()
+            self.devices.append(tmp)
+            return True
+        self.devices.pop(did)
+        return True
+
+    def list_devices(self, args):
+        i = 0
+        if len(self.devices) == 0: print("no device connected")
+        for el in self.devices:
+            print("[", i, "]", el.slave_name, el.device.serial.port, el.device.serial.baudrate, el.device.address)
+            print(id(el.device.serial.port))
+            i += 1
+
     def read_scope(self, args):
+        """
+        read_scope [device ID]
+        Read scope device FIFO
+        :param args:
+            args[1] - device number
+        :return:
+        """
+
         curdev = 0
         try:
             curdev = int(args[1])
@@ -58,7 +126,15 @@ class Server:
             except (minimalmodbus.SlaveDeviceBusyError, minimalmodbus.InvalidResponseError): return True
 
     def read_register(self, args):
+        """
+        read_register  [device ID] [register number] [register type]
 
+        :param args:
+            device ID - default 0
+            register number - if defined read one register else read all
+            register type = 3 -Input , 4 - holding
+        :return:
+        """
         curdev = 0
         register_to_read = 0
         function_code = 4
@@ -74,6 +150,8 @@ class Server:
         try:
             function_code = int(args[3])
         except (ValueError, IndexError): pass
+
+        print(args)
 
         if (curdev+1) > len(self.devices):
             raise self.ServerError("Select another device. Available ", len(self.devices))
@@ -101,15 +179,53 @@ class Server:
         # read one register
         else:
             if register_to_read+1 > len(buff[function_code]): raise ValueError("Input register out of range  ")
-            buff[function_code][register_to_read] = self.devices[0].device.read_registers(
+            res = buff[function_code][register_to_read] = self.devices[curdev].device.read_registers(
                 register_to_read,
                 1,
                 functioncode=function_code)[0]
+            print("  =",res)
         return True
 
     def __init__(self):
-        self.consol = {"connect": self.connect, "read_input": self.read_register, "read_scope": self.read_scope}
+        self.consol = {"connect": self.connect, "read": self.read_register,
+                       "read_scope": self.read_scope, "devices": self.list_devices,
+                       "rm": self.rm_device, "write": self.write_register
+                       }
         self.devices = []
+
+    def write_register(self, args):
+        """
+                read_register  [device ID] [register number] [value]
+
+                :param args:
+                    device ID - default 0
+                    register number - if defined read one register else read all
+                    register type = 3 -Input , 4 - holding
+                :return:
+                """
+        curdev = 0
+        addres = 0
+        value = 0
+
+        try:
+            curdev = int(args[1])
+            addres = int(args[2])
+            value = int(args[3])
+        except (ValueError, IndexError):
+            return False
+        if curdev > len(self.devices)-1: return False
+        print(args)
+        signed = False
+        if value < 0: signed = True
+        try:
+            res = self.devices[curdev].device.write_register(addres, value, signed = signed)
+        except termios.error as e:
+            print(e)
+            raise self.ServerError(e.args)
+        req = "read "+str(curdev)+" "+str(addres)+" 3"
+        #print("  =",res)
+        self.main(inpt=req)
+
 
     def create_server(self, port, speed, sid):
         """
@@ -117,24 +233,35 @@ class Server:
         :param port: COM port name
         :param speed: COM port baud rate
         :param sid: Modbus slave address
+        :param -a: find all devices or stop at first
         :return: True if device found
         """
+
         master = minimalmodbus.Instrument(port, sid)
+        master.serial = serialutil.Serial(port)
         master.serial.baudrate = speed
         master.serial.bytesize = 8
         master.serial.parity = serial.PARITY_NONE
         master.serial.stopbits = 1
-        master.serial.timeout = 0.025  # seconds
+        master.serial.timeout = 0.100  # seconds
         master.debug = False
+
         try:
             req = master._perform_command(43, '\x0E\x01\x01\x00\x00')
-        except minimalmodbus.NoResponseError:
+        except (
+            ValueError,
+            minimalmodbus.NoResponseError,
+            minimalmodbus.InvalidResponseError
+        ) as e:
+            print(e)
             return False
-        else:
-            req = req[8:16] + req[32:40] + req[44:52]
-            self.devices.append(self.Device(master))
 
-            return True
+        req = req[8:16] + req[32:40] + req[44:52]
+        tmp = self.Device(master, req)
+
+        self.devices.append(tmp)
+        print("Device ID: ", req)
+        return True
 
     def connect(self, args):
         """
@@ -148,6 +275,7 @@ class Server:
         ports = [el.device for el in serials]
         sids = range(1, 256)
         alloption = False
+        srcoption = False
         try:
             sids = range(int(args[3]), int(args[3]) + 1)
         except (ValueError, IndexError):
@@ -162,6 +290,7 @@ class Server:
             pass
         try:
             if args[4] == '-a': alloption = True
+            if args[4] == '-s': srcoption = True
         except IndexError:
             pass
 
@@ -172,14 +301,21 @@ class Server:
                     if (alloption is False) & (len(self.devices) != 0): break
                     for speed in speeds:
                         if (alloption is False) & (len(self.devices) != 0): break
-                        print("Searching", port, sid, speed)
-                        self.create_server(port, speed, sid)
+                        print("Searching:\n  Port =", port, "\n  Speed =", speed, "\n  Modbus ID =", sid)
+                        try:
+                            self.create_server(port, speed, sid)
+                        except (
+                                ValueError,
+                                #minimalmodbus.NoResponseError,
+                                #minimalmodbus.InvalidResponseError
+                        ) as e:
+                            print(e)
             except serial.serialutil.SerialException as e:
                 print(e)
                 raise self.ServerError(e.args)
 
         if len(self.devices) > 0:
-            print("Found ", len(self.devices), " devices")
+            print("Found ", len(self.devices), " devices. ")
             return True
         raise self.ServerError(
             "Current ports: \n" + "\n".join(ports) + "\nDevice Not found"
@@ -193,4 +329,13 @@ class Server:
 
 
 if __name__ == '__main__':
-    print("sdfd")
+    srv = Server()
+    srv.main(inpt="connect * * *")
+    srv.main(inpt="devices")
+    srv.main(inpt="read 0 * 3")
+   # srv.main(inpt="read 1 * 4")
+    print(srv.devices[0].holdings)
+    srv.main(inpt="write 0 3 5")
+    #srv.main(inpt="read 0 0 3")
+    print(srv.devices[0].holdings)
+
