@@ -1,5 +1,5 @@
 import sys
-import termios
+#import termios
 
 import serial.tools.list_ports
 import minimalmodbus
@@ -8,6 +8,7 @@ from collections import deque
 from datetime import time, datetime
 import copy
 import serial as serialutil
+
 
 
 class Server:
@@ -151,7 +152,7 @@ class Server:
             function_code = int(args[3])
         except (ValueError, IndexError): pass
 
-        print(args)
+        # print(args) # console out
 
         if (curdev+1) > len(self.devices):
             raise self.ServerError("Select another device. Available ", len(self.devices))
@@ -236,17 +237,18 @@ class Server:
         :param -a: find all devices or stop at first
         :return: True if device found
         """
-
         master = minimalmodbus.Instrument(port, sid)
+        master.serial.close()
         master.serial = serialutil.Serial(port)
         master.serial.baudrate = speed
         master.serial.bytesize = 8
         master.serial.parity = serial.PARITY_NONE
         master.serial.stopbits = 1
-        master.serial.timeout = 0.100  # seconds
+        master.serial.timeout = 0.50  # seconds
         master.debug = False
-
+        master.close_port_after_each_call = False
         try:
+            print("req id")
             req = master._perform_command(43, '\x0E\x01\x01\x00\x00')
         except (
             ValueError,
@@ -254,6 +256,8 @@ class Server:
             minimalmodbus.InvalidResponseError
         ) as e:
             print(e)
+            master.serial.close()
+            print("port closed")
             return False
 
         req = req[8:16] + req[32:40] + req[44:52]
@@ -310,15 +314,17 @@ class Server:
                                 #minimalmodbus.InvalidResponseError
                         ) as e:
                             print(e)
+
             except serial.serialutil.SerialException as e:
                 print(e)
-                raise self.ServerError(e.args)
+               #self.devices[0].serial.close()
 
         if len(self.devices) > 0:
             print("Found ", len(self.devices), " devices. ")
             return True
         raise self.ServerError(
             "Current ports: \n" + "\n".join(ports) + "\nDevice Not found"
+
         )
 
     def main(self, inpt):
@@ -330,12 +336,17 @@ class Server:
 
 if __name__ == '__main__':
     srv = Server()
-    srv.main(inpt="connect * * *")
+    srv.main(inpt="connect COM8 9600 1")
     srv.main(inpt="devices")
-    srv.main(inpt="read 0 * 3")
-   # srv.main(inpt="read 1 * 4")
-    print(srv.devices[0].holdings)
-    srv.main(inpt="write 0 3 5")
-    #srv.main(inpt="read 0 0 3")
-    print(srv.devices[0].holdings)
+    srv.devices[0].device.read_registers(
+        8,
+       2,
+        functioncode=3)
+   #  srv.main(inpt="read 0 * 3")
+   # # srv.main(inpt="read 1 * 4")
+   #  print(srv.devices[0].holdings)
+   #  srv.main(inpt="write 0 3 5")
+   #  #srv.main(inpt="read 0 0 3")
+   #  print(srv.devices[0].holdings)
+
 

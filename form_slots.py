@@ -3,16 +3,19 @@ Created on 28 нояб. 2019 г.
 
 @author: sergey
 '''
+import ctypes
 import io
 
 import minimalmodbus
 import serial
-from PyQt5.QtCore import pyqtSlot
-from PyQt5.QtGui import QIntValidator, QCursor
-from PyQt5.QtWidgets import QTableWidgetItem, QWidget, QComboBox, QLineEdit, QMenu, QHeaderView
+from PyQt5.QtCore import pyqtSlot, QTimer
+from PyQt5.QtGui import QIntValidator, QCursor, QTextCursor
+from PyQt5.QtWidgets import QTableWidgetItem, QWidget, QComboBox, QLineEdit, QMenu, QHeaderView, QScrollBar
 import json
+import ProdSensEmu
 
-from qtconsole.qt import QtCore, QtGui
+# from qtconsole.qt import QtCore, QtGui
+from PyQt5 import QtCore
 
 """
 Пользовательские слоты для виджетов.
@@ -23,43 +26,94 @@ from form_ui import Ui_Form
 import server as srv
 import sys
 
+
 # Создаём собственный класс, наследуясь от автоматически сгенерированного
 class MainWindowSlots(Ui_Form):
 
     def __init__(self):
         self.cmd_list = []
         self.srv = srv.Server()
-        self.indicators = []
         self.ylwcells = []
         self.out_tmp = sys.stdout
         sys.stdout = io.StringIO("", newline=None)
         print("aefwsgr")
 
     def proc(self):
-        self.check_holding_table()
-            # First int
+
+        # First int
         if len(self.srv.devices) > 0: self.widget_init()
+        self.check_holding_table()
 
-            # input indicators refresh
-            # if len(self.srv.devices[0].inputs) >= len(self.indicators):
-            #     for i in range(len(self.indicators)-1):
-            #         self.indicators[i].display(self.srv.devices[0].inputs[i+3])
+        # input indicators refresh
+        if len(self.srv.devices) > 0:
+            self.cmd_list.append("read 0 * 4")
+            if len(self.srv.devices[0].inputs) >= len(self.indicators):
+                for i in range(len(self.indicators) - 1):
 
-        #stdout read to form
-        self.plainTextEdit_consol.textCursor().insertText(sys.stdout.getvalue())
-        sys.stdout = io.StringIO("", newline=None)
+                    tmp = ctypes.c_int16(self.srv.devices[0].inputs[i + 3])
+                    self.indicators[i].setText(str(tmp.value/10))
+                self.label_DevStatus.setText(str(hex(self.srv.devices[0].inputs[2])))
+
+
+        # prodsens emulator controls
+        try:
+            self.pse.setFreqValue(float(self.lineEdit_EmuOut.text()))
+        except ValueError:
+            self.lineEdit_EmuOut.setText("0")
+
+        # stdout read to form
+        tmp = sys.stdout.getvalue()
+        if len(tmp) > 0:
+            textCursor = self.plainTextEdit_consol.textCursor()
+            textCursor.movePosition(QTextCursor.End, QTextCursor.MoveAnchor, 1)
+            self.plainTextEdit_consol.setTextCursor(textCursor)
+            self.plainTextEdit_consol.textCursor().insertText(tmp)
+            self.plainTextEdit_consol.verticalScrollBar().setValue(
+                self.plainTextEdit_consol.verticalScrollBar().maximum()
+            )
+            sys.stdout = io.StringIO("", newline=None)
+
+    # production sensor
+    def prodseninit(self):
+
+        self.lineEdit_EmuPort.setText("COM6")
+        self.lineEdit_EmuSpeed.setText("38400")
+
+        def pse_con_lstn():
+            try:
+                spd = int(self.lineEdit_EmuSpeed.text())
+            except ValueError:
+                return
+            self.timer3 = None
+            self.pse = ProdSensEmu.ProdSensEmu(self.lineEdit_EmuPort.text(), spd)
+            if self.pse.port is None: return
+            self.timer3 = QTimer()
+            self.timer3.timeout.connect(lambda: self.pse.start())
+            self.timer3.start(5)
+
+        pse_con_lstn()
+        self.pushButton_EmuPortOpen.clicked.connect(pse_con_lstn)
 
     # Определяем пользовательский слот
     def btn_connect_push(self):
         self.tableWidget.setRowCount(0)
-        self.cmd_list.append("connect /dev/ttyACM0 38400 1")
+        self.cmd_list.append("connect * 9600 1")
         self.cmd_list.append("read 0 * 3")
         self.cmd_list.append("read 0 * 4")
         return None
 
     def slot_slider_moved(self):
+        # if len(self.cmd_list) > 0:
+        #     print(self.cmd_list[1][0:10])
+        #     #if self.cmd_list[1] == "write 0 3 ": return
         req = "write 0 3 " + str(self.horizontalSlider.value())
-        #self.lcd_freqref.display(self.horizontalSlider.value())
+        # self.lcd_freqref.display(self.horizontalSlider.value())
+        self.cmd_list.append(req)
+        pass
+
+    def slot_slider_released(self):
+        req = "write 0 3 " + str(self.horizontalSlider.value())
+        # self.lcd_freqref.display(self.horizontalSlider.value())
         self.cmd_list.append(req)
         pass
 
@@ -69,18 +123,17 @@ class MainWindowSlots(Ui_Form):
             for i in range(self.tableWidget.rowCount()):
                 tmp2 = int(self.tableWidget.cellWidget(i, 1).text())
                 if tmp2 != self.srv.devices[0].holdings[i]:
-                    formatter="QLineEdit {background-color: Red;}"
+                    formatter = "QLineEdit {background-color: Red;}"
                     print("Warning: \n"
                           "Cell wrong value adr=", i, " cell=", tmp2, " dev=", self.srv.devices[0].holdings[i])
                     self.tableWidget.cellWidget(i, 1).setText(str(self.srv.devices[0].holdings[i]))
                 else:
                     if i in self.ylwcells:
-                        formatter="QLineEdit {background-color: LightGreen;}"
+                        formatter = "QLineEdit {background-color: LightGreen;}"
                     else:
                         formatter = "QLineEdit {background-color: White;}"
                 self.tableWidget.cellWidget(i, 1).setStyleSheet(formatter)
             self.ylwcells.clear()
-
 
     def marking_cell(self, row):
         ##
@@ -95,15 +148,15 @@ class MainWindowSlots(Ui_Form):
         act_load_from_dev.triggered.connect(self.slot_act_load_form_dev)
         # act_load_to_dev = menu.addAction("Обновить на устройстве")
         act_save_to_dev = menu.addAction("Сохранить в память МПЧ")
-        act_save_to_dev.triggered.connect(lambda:  self.cmd_list.append("write 0 0 8"))
+        act_save_to_dev.triggered.connect(lambda: self.cmd_list.append("write 0 0 8"))
         # act_save_to_file = menu.addAction("Сохранить в файл")
         # act_load_from_flash = menu.addAction("Загрузить из памяти МПЧ")
         # act_load_from_default = menu.addAction("Сброс к заводским установкам")
         menu.exec(QCursor.pos())
 
     def slot_act_load_form_dev(self):
-        #self.tableWidget.clear()
-        #self.tableWidget.setRowCount(0)
+        # self.tableWidget.clear()
+        # self.tableWidget.setRowCount(0)
         self.cmd_list.append("read 0 * 3")
         self.ylwcells.append(0)
 
@@ -155,7 +208,8 @@ class MainWindowSlots(Ui_Form):
                                         req = "write 0 " + str(self.tableWidget.currentRow()) + " " + \
                                               self.tableWidget.cellWidget(self.tableWidget.currentRow(), 1).text()
                                         self.cmd_list.append(req)
-                                except AttributeError: pass
+                                except AttributeError:
+                                    pass
 
                             # connecting event to combobox
                             self.tableWidget.cellWidget(x, 2).currentIndexChanged.connect(item_indCng)
@@ -170,12 +224,12 @@ class MainWindowSlots(Ui_Form):
                     # disabling cell changing at column 0,2
                     item = QTableWidgetItem("")
                     item.setFlags(QtCore.Qt.ItemIsEnabled)
-                    self.tableWidget.setItem(x, 2, item)
-                    self.tableWidget.setItem(x, 1, item)
+                    # self.tableWidget.setItem(x, 2, item)
+                    self.tableWidget.setItem(x, 0, item)
                 # Set cell value at column 1
                 item = QLineEdit(str(self.srv.devices[0].holdings[x]))
                 # Only int numbers
-                item.setValidator(QIntValidator(-10000, 10000))
+                item.setValidator(QIntValidator(-65536, 65536))
 
                 # Cell value changing event
                 def cell_pressed():
@@ -186,7 +240,8 @@ class MainWindowSlots(Ui_Form):
                         if tmp > self.tableWidget.cellWidget(self.tableWidget.currentRow(), 2).count(): tmp = -1
                         # changing combobox index
                         self.tableWidget.cellWidget(self.tableWidget.currentRow(), 2).setCurrentIndex(tmp)
-                    except (ValueError, AttributeError): pass
+                    except (ValueError, AttributeError) as e:
+                        print(e)
                     # marking cell
                     self.marking_cell(self.tableWidget.currentRow())
                     # request for holding register changing
@@ -199,10 +254,11 @@ class MainWindowSlots(Ui_Form):
                         self.tableWidget.cellWidget(self.tableWidget.currentRow(), 1).setStyleSheet(
                             "QLineEdit {background-color: Pink;}"
                         )
-                    except AttributeError: pass
+                    except AttributeError:
+                        pass
 
                 # connecting event to QLineEdit
                 item.returnPressed.connect(cell_pressed)
                 item.textChanged.connect(cell_changed)
                 self.tableWidget.setCellWidget(x, 1, item)
-                self.tableWidget.setColumnWidth(1,50)
+            # self.tableWidget.setColumnWidth(1,50)
