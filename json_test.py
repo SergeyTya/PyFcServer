@@ -1,6 +1,13 @@
 import json
 
-with open('PRM.json', 'r', encoding='Windows-1251') as fh: #открываем файл на чтение
-    data = json.load(fh) #загружаем из файла данные в словарь data
 
-print(data)
+def gen(max, val=0):
+    while val <= max:
+        val += 1
+        if val == max: val = 0
+        yield val
+
+
+gnr = gen(100)
+while True:
+    print(next(gnr))

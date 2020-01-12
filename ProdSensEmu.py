@@ -1,34 +1,14 @@
 import math
 import struct
+import sys
+from collections import deque
 
 import serial
 from PyQt5.QtCore import QTimer, QThread
 from PyQt5.QtWidgets import QApplication
-
+import LogerGraf
 
 class ProdSensEmu(QThread):
-
-    def __init__(self, port_name, speed):
-        QThread.__init__(self)
-        try:
-            self.port = None
-            tmp = serial.Serial(port_name, speed)
-            tmp.parity = serial.PARITY_NONE
-            tmp.bytesize = serial.EIGHTBITS
-            tmp.stopbits = serial.STOPBITS_ONE
-            tmp.xonxoff = False  # disable software flow control
-            tmp.rtscts = False  # disable hardware (RTS/CTS) flow control
-            tmp.dsrdtr = False  # disable hardware (DSR/DTR) flow control
-            tmp.set_buffer_size(rx_size = 256 , tx_size = 256)
-            tmp.writeTimeout = 2
-            self.port = tmp
-            self.freq = 0.0
-            self.pse_float_value = 0
-            self.cerr = 0
-            print("Production sens emulator started: ")
-            print(" Port = ", port_name, " Speed=", speed)
-        except serial.serialutil.SerialException as e:
-            print(e)
 
     # modbus CRC
     @staticmethod
@@ -95,29 +75,83 @@ class ProdSensEmu(QThread):
         man, exp = math.frexp(x)
         return int((2 * man + (exp + 125)) * 0x800000)
 
+    @staticmethod
+    def gen(max, val=0):
+        while val <= max:
+            val += 1
+            if val == max: val = 0
+            yield val
+
     def setFreqValue(self, freq):
         self.freq = freq
+
+    def setOutpuGain(self, gain):
+        if gain > 0:
+            self.gain = gain
+
+
+    def __init__(self, port_name, speed):
+        QThread.__init__(self)
+        try:
+            self.port = None
+            tmp = serial.Serial(port_name, speed)
+            tmp.parity = serial.PARITY_NONE
+            tmp.bytesize = serial.EIGHTBITS
+            tmp.stopbits = serial.STOPBITS_ONE
+            tmp.xonxoff = False  # disable software flow control
+            tmp.rtscts = False  # disable hardware (RTS/CTS) flow control
+            tmp.dsrdtr = False  # disable hardware (DSR/DTR) flow control
+            #tmp.set_buffer_size(rx_size = 256 , tx_size = 256)
+            tmp.writeTimeout = 2
+            self.port = tmp
+            self.freq = 0.0
+            self.gain = 1.0
+            self.pse_float_value = 0.0
+            self.cerr = 0
+
+            # # logger list
+            # max_x = 10000
+            # self.log = [deque([0] * max_x, maxlen=max_x), deque([0] * max_x, maxlen=max_x)]
+            # self.log[0].extend(range(0, max_x))
+            # # generator for logger update
+            # self.gnr = self.gen(len(self.log[0]))
+
+            self.logger = LogerGraf.LoggerWindow(title="Production sensor value", update_time=10)
+
+
+            print("Production sens emulator started: ")
+            print(" Port = ", port_name, " Speed=", speed)
+        except serial.serialutil.SerialException as e:
+            print(e)
 
     def run(self):
         if self.port is None: return
         if not self.port.is_open: return
-        cnt = self.port.in_waiting
+        # Production model
+        self.pse_float_value = self.freq * self.gain
+        if self.pse_float_value == 0: self.pse_float_value = 1e-6
+
+        # logging graf
+
+        # cnt = next(self.gnr)
+        # self.log[1][cnt] = self.pse_float_value
+
+        self.logger.logValue(self.pse_float_value)
+
         # 8 byte request
+        cnt = self.port.in_waiting
         if cnt >= 8:
             # print("PSE: get request: ")
             res = self.port.read_all()
             # if list(map(hex,  self.getcrc(res[0:6]))) == list(map(hex, res[6:8])):
             if list(map(hex, res[6:8])) == ['0x45', '0xc9']:
-                # print("crc Ok")
                 # 9 byte response
                 # converting float pse value to IEEE754 byte
-                self.pse_float_value = self.freq
-                if self.pse_float_value == 0: self.pse_float_value = 1e-6
                 ans = [0x01, 0x03, 0x04] + list(struct.pack('<I', self.to_bits(self.pse_float_value)))
                 self.port.write(ans + self.getcrc(ans))
                 self.cerr = 0
             else:
-                print("crc error")
+                print("PSE - crc error")
         # counting error
         else:
             self.cerr += 1
