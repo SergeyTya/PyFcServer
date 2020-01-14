@@ -1,12 +1,11 @@
 from collections import deque
 
 from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QMainWindow
 from pyqtgraph import PlotWidget
-from qtpy import QtWidgets
-import sys
 
 
-class LoggerWindow(QtWidgets.QMainWindow):
+class LoggerWindow(QMainWindow):
 
     @staticmethod
     def gen(max, val=0):

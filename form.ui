@@ -46,7 +46,7 @@
         <x>0</x>
         <y>0</y>
         <width>175</width>
-        <height>391</height>
+        <height>415</height>
        </rect>
       </property>
       <attribute name="label">
@@ -265,7 +265,7 @@
         <x>0</x>
         <y>0</y>
         <width>175</width>
-        <height>391</height>
+        <height>415</height>
        </rect>
       </property>
       <attribute name="label">
@@ -412,7 +412,7 @@
         <x>0</x>
         <y>0</y>
         <width>175</width>
-        <height>391</height>
+        <height>415</height>
        </rect>
       </property>
       <attribute name="label">
@@ -544,7 +544,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>161</width>
+        <width>158</width>
         <height>418</height>
        </rect>
       </property>
@@ -563,17 +563,17 @@
          <property name="rowCount">
           <number>16</number>
          </property>
-         <attribute name="horizontalHeaderDefaultSectionSize">
-          <number>57</number>
-         </attribute>
          <attribute name="horizontalHeaderMinimumSectionSize">
           <number>48</number>
          </attribute>
-         <attribute name="verticalHeaderDefaultSectionSize">
-          <number>21</number>
+         <attribute name="horizontalHeaderDefaultSectionSize">
+          <number>57</number>
          </attribute>
          <attribute name="verticalHeaderMinimumSectionSize">
           <number>20</number>
+         </attribute>
+         <attribute name="verticalHeaderDefaultSectionSize">
+          <number>21</number>
          </attribute>
          <row>
           <property name="text">
@@ -675,7 +675,7 @@
         <x>0</x>
         <y>0</y>
         <width>175</width>
-        <height>391</height>
+        <height>415</height>
        </rect>
       </property>
       <attribute name="label">
@@ -688,7 +688,7 @@
         <x>0</x>
         <y>0</y>
         <width>175</width>
-        <height>391</height>
+        <height>415</height>
        </rect>
       </property>
       <attribute name="label">
@@ -751,7 +751,7 @@
         <bool>false</bool>
        </property>
        <property name="currentIndex">
-        <number>3</number>
+        <number>0</number>
        </property>
        <property name="usesScrollButtons">
         <bool>false</bool>
@@ -786,6 +786,11 @@
              <width>10</width>
              <height>0</height>
             </size>
+           </property>
+           <property name="font">
+            <font>
+             <pointsize>14</pointsize>
+            </font>
            </property>
            <property name="acceptDrops">
             <bool>false</bool>
@@ -920,8 +925,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>633</width>
-              <height>388</height>
+              <width>631</width>
+              <height>391</height>
              </rect>
             </property>
             <property name="layoutDirection">
@@ -1000,7 +1005,7 @@
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout_psegraf"/>
         </widget>
-        <widget class="QWidget" name="">
+        <widget class="QWidget" name="layoutWidget">
          <property name="geometry">
           <rect>
            <x>10</x>

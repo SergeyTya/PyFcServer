@@ -102,7 +102,7 @@ if __name__ == '__main__':
     # поток
     timer = QTimer()
     timer.timeout.connect(ui.proc)
-    timer.start(200)
+    timer.start(50)
 
 
     # thread in timer to process serial communication
@@ -131,7 +131,7 @@ if __name__ == '__main__':
     th = ServerProcTread(ui.cmd_list, server)
     timer2 = QTimer()
     timer2.timeout.connect(lambda: th.start())
-    timer2.start(10)
+    timer2.start(20)
 
     # Отображаем окно
     window.show()

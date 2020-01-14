@@ -105,17 +105,9 @@ class ProdSensEmu(QThread):
             tmp.writeTimeout = 2
             self.port = tmp
             self.freq = 0.0
-            self.gain = 1.0
+            self.gain = 0.15
             self.pse_float_value = 0.0
             self.cerr = 0
-
-            # # logger list
-            # max_x = 10000
-            # self.log = [deque([0] * max_x, maxlen=max_x), deque([0] * max_x, maxlen=max_x)]
-            # self.log[0].extend(range(0, max_x))
-            # # generator for logger update
-            # self.gnr = self.gen(len(self.log[0]))
-
             self.logger = LogerGraf.LoggerWindow(title="Production sensor value", update_time=10)
 
 
@@ -131,17 +123,11 @@ class ProdSensEmu(QThread):
         self.pse_float_value = self.freq * self.gain
         if self.pse_float_value == 0: self.pse_float_value = 1e-6
 
-        # logging graf
-
-        # cnt = next(self.gnr)
-        # self.log[1][cnt] = self.pse_float_value
-
         self.logger.logValue(self.pse_float_value)
 
         # 8 byte request
         cnt = self.port.in_waiting
         if cnt >= 8:
-            # print("PSE: get request: ")
             res = self.port.read_all()
             # if list(map(hex,  self.getcrc(res[0:6]))) == list(map(hex, res[6:8])):
             if list(map(hex, res[6:8])) == ['0x45', '0xc9']:

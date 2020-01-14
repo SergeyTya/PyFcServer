@@ -5,6 +5,7 @@ Created on 28 нояб. 2019 г.
 '''
 import ctypes
 import io
+import math
 
 import minimalmodbus
 import serial
@@ -63,9 +64,13 @@ class MainWindowSlots(Ui_Form):
                     tmp = float(self.lineEdit_EmuOut_gain.text())
                     self.pse.setOutpuGain(tmp)
                 except ValueError: pass
-                self.pse.setFreqValue(float(self.srv.devices[0].inputs[3]/10))
+
+                tmp_vl = ctypes.c_int16(self.srv.devices[0].inputs[3])
+                self.pse.setFreqValue(math.fabs(tmp_vl.value/10))
+
                 #self.lineEdit_EmuOut.setText(str(self.pse.pse_float_value).format("f%2"))
                 self.lineEdit_EmuOut.setText('{0: >#016.2f}'.format(self.pse.pse_float_value))
+                
         if len(self.srv.devices) > 0:
             if len(self.srv.devices[0].inputs) > 0:
                 for i in range(len(self.indicators)):
@@ -85,8 +90,8 @@ class MainWindowSlots(Ui_Form):
 
     # production sensor
     def prodseninit(self):
-
-        self.lineEdit_EmuPort.setText("/dev/ttyUSB0")
+        self.lineEdit_EmuOut_gain.setText("0.042")
+        self.lineEdit_EmuPort.setText("COM6")
         self.lineEdit_EmuSpeed.setText("38400")
 
         def pse_con_lstn():
@@ -102,7 +107,7 @@ class MainWindowSlots(Ui_Form):
             if self.pse.port is None: return
             self.timer3 = QTimer()
             self.timer3.timeout.connect(lambda: self.pse.start())
-            self.timer3.start(5)
+            self.timer3.start(10)
 
         pse_con_lstn()
         self.pushButton_EmuPortOpen.clicked.connect(pse_con_lstn)
@@ -110,7 +115,7 @@ class MainWindowSlots(Ui_Form):
     # Определяем пользовательский слот
     def btn_connect_push(self):
         self.tableWidget.setRowCount(0)
-        self.cmd_list.append("connect /dev/ttyACM0 9600 1")
+        self.cmd_list.append("connect COM8 115200 1")
         self.cmd_list.append("read 0 * 3")
         self.cmd_list.append("read 0 * 4")
         return None
@@ -313,3 +318,4 @@ class MainWindowSlots(Ui_Form):
             # self.tableWidget.setColumnWidth(1,50)
             self.tableWidget.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
             self.tableWidget.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+            self.tableWidget.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
