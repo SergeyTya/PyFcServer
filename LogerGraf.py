@@ -1,6 +1,7 @@
 from collections import deque
 
 from PyQt5.QtCore import QTimer
+from PyQt5.QtGui import QWindow
 from PyQt5.QtWidgets import QMainWindow
 from pyqtgraph import PlotWidget
 

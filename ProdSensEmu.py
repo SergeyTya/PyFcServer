@@ -93,6 +93,7 @@ class ProdSensEmu(QThread):
     def __init__(self, port_name, speed):
         QThread.__init__(self)
         try:
+            self.connect = False
             self.port = None
             tmp = serial.Serial(port_name, speed)
             tmp.parity = serial.PARITY_NONE
@@ -103,47 +104,54 @@ class ProdSensEmu(QThread):
             tmp.dsrdtr = False  # disable hardware (DSR/DTR) flow control
             #tmp.set_buffer_size(rx_size = 256 , tx_size = 256)
             tmp.writeTimeout = 2
+            tmp.open()
             self.port = tmp
             self.freq = 0.0
             self.gain = 0.15
             self.pse_float_value = 0.0
             self.cerr = 0
-            self.logger = LogerGraf.LoggerWindow(title="Production sensor value", update_time=10)
 
+            self.logger = LogerGraf.LoggerWindow(title="Production sensor value", update_time=10)
 
             print("Production sens emulator started: ")
             print(" Port = ", port_name, " Speed=", speed)
+            self.connect = True
         except serial.serialutil.SerialException as e:
             print(e)
+            self.connect = False
 
     def run(self):
+        if not self.connect: return
         if self.port is None: return
         if not self.port.is_open: return
         # Production model
-        self.pse_float_value = self.freq * self.gain
-        if self.pse_float_value == 0: self.pse_float_value = 1e-6
-
-        self.logger.logValue(self.pse_float_value)
-
+        try:
+            self.pse_float_value = self.freq * self.gain
+            if self.pse_float_value == 0: self.pse_float_value = 1e-6
+            self.logger.logValue(self.pse_float_value)
         # 8 byte request
-        cnt = self.port.in_waiting
-        if cnt >= 8:
-            res = self.port.read_all()
-            # if list(map(hex,  self.getcrc(res[0:6]))) == list(map(hex, res[6:8])):
-            if list(map(hex, res[6:8])) == ['0x45', '0xc9']:
-                # 9 byte response
-                # converting float pse value to IEEE754 byte
-                ans = [0x01, 0x03, 0x04] + list(struct.pack('<I', self.to_bits(self.pse_float_value)))
-                self.port.write(ans + self.getcrc(ans))
-                self.cerr = 0
+            cnt = self.port.in_waiting
+            if cnt >= 8:
+                res = self.port.read_all()
+                # if list(map(hex,  self.getcrc(res[0:6]))) == list(map(hex, res[6:8])):
+                if list(map(hex, res[6:8])) == ['0x45', '0xc9']:
+                    # 9 byte response
+                     # converting float pse value to IEEE754 byte
+                    ans = [0x01, 0x03, 0x04] + list(struct.pack('<I', self.to_bits(self.pse_float_value)))
+                    self.port.write(ans + self.getcrc(ans))
+                    self.cerr = 0
+                else:
+                    print("PSE - crc error")
+            # counting error
             else:
-                print("PSE - crc error")
-        # counting error
-        else:
-            self.cerr += 1
-            if self.cerr > 500:
-                self.cerr = 0
+                self.cerr += 1
+                if self.cerr > 500: self.cerr = 0
                 print("PSE - connection timeout")
+        except serial.serialutil.SerialException as e:
+            print(e)
+            self.connect = False
+
+
 
 if __name__ == '__main__':
     pass

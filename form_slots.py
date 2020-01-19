@@ -12,18 +12,20 @@ import serial
 from PyQt5.QtCore import pyqtSlot, QTimer
 from PyQt5.QtGui import QIntValidator, QCursor, QTextCursor, QDoubleValidator
 from PyQt5.QtWidgets import QTableWidgetItem, QWidget, QComboBox, QLineEdit, QMenu, QHeaderView, QScrollBar, \
-    QPushButton, QSizePolicy
+    QPushButton, QSizePolicy, QDialog, QInputDialog, QMainWindow
 import json
 import ProdSensEmu
 
 # from qtconsole.qt import QtCore, QtGui
 from PyQt5 import QtCore
 
+from form_consetup import Ui_Dialog
+
 """
 Пользовательские слоты для виджетов.
 """
 # Импортируем класс интерфейса из созданного конвертером модуля
-from form_ui import Ui_Form
+from form_ui import Ui_MainWindow as Ui_Form
 
 import server as srv
 import sys
@@ -33,6 +35,8 @@ import sys
 class MainWindowSlots(Ui_Form):
 
     def __init__(self):
+        self.send_total = 0
+        self.send_err = 0
         self.cmd_list = []
         self.srv = srv.Server()
         self.ylwcells = []
@@ -40,22 +44,55 @@ class MainWindowSlots(Ui_Form):
         sys.stdout = io.StringIO("", newline=None)
         self.jsdtr = None
         self.loggers = [0] * 10
-        print("aefwsgr")
+        self.jsstatus = []
+        try:
+            with open('status.json', 'r') as fh:  # открываем файл на чтение
+                self.jsstatus = json.load(fh)  # загружаем из файла данные в словарь data
+        except (
+                json.decoder.JSONDecodeError,
+                FileNotFoundError
+        ) as e: print(e)
 
     def proc(self):
+        # status bar
+        tmpstbar = "нет устройства"
+        if len(self.srv.devices) > 0:
+            if len(self.srv.devices[0].inputs) > 2:
+                tmpdvname = self.srv.devices[0].slave_name
+                tmpstbar = self.srv.devices[0].device.serial.port + " " + str(self.srv.devices[0].device.serial.baudrate)+\
+                           " Adr "+str(self.srv.devices[0].device.address) +" : " + tmpdvname +\
+                           " : status "+ str(hex(self.srv.devices[0].inputs[2]))+\
+                           " : tot=" + str(self.send_total)+ " err=" + str(self.send_err)
+        self.statusbar.showMessage(tmpstbar)
 
         # First int
         if len(self.srv.devices) > 0: self.widget_init()
+
+        # Holding table check
         self.check_holding_table()
 
         # input indicators refresh
         if len(self.srv.devices) > 0:
             self.cmd_list.append("read 0 * 4")
             if len(self.srv.devices[0].inputs) >= len(self.indicators):
-                for i in range(len(self.indicators) - 1):
+                for i, el in enumerate(self.indicators):
                     tmp = ctypes.c_int16(self.srv.devices[0].inputs[i + 3])
-                    self.indicators[i].setText(str(tmp.value / 10))
-                self.label_DevStatus.setText(str(hex(self.srv.devices[0].inputs[2])))
+                    inid_str =str(tmp.value / 10) + el.toolTip()
+                    el.setText(inid_str)
+
+        # Device status label
+        if len(self.srv.devices) > 0:
+            if len(self.srv.devices[0].inputs) > 2:
+                str_status = str(hex(self.srv.devices[0].inputs[2]))
+                try:
+                    str_status2 = " " + self.jsstatus[0][str_status[2:3]][0]+" "+self.jsstatus[1][str_status[3:5]]
+                    self.label_DevStatus.setStyleSheet(self.jsstatus[0][str_status[2:3]][1])
+                except (
+                        KeyError,
+                        IndexError
+                ):
+                    str_status2 = str_status
+                self.label_DevStatus.setText(str_status2)
 
         # prodsens emulator controls
         if len(self.srv.devices) > 0:
@@ -69,14 +106,14 @@ class MainWindowSlots(Ui_Form):
                 self.pse.setFreqValue(math.fabs(tmp_vl.value/10))
 
                 #self.lineEdit_EmuOut.setText(str(self.pse.pse_float_value).format("f%2"))
-                self.lineEdit_EmuOut.setText('{0: >#016.2f}'.format(self.pse.pse_float_value))
-                
+                #self.lineEdit_EmuOut.setText('{0: >#016.2f}'.format(self.pse.pse_float_value))
+
         if len(self.srv.devices) > 0:
             if len(self.srv.devices[0].inputs) > 0:
                 for i in range(len(self.indicators)):
                     self.loggers[i].logValue(self.srv.devices[0].inputs[i+3])
 
-        # stdout read to form
+        # stdout read to form consol
         tmp = sys.stdout.getvalue()
         if len(tmp) > 0:
             textCursor = self.plainTextEdit_consol.textCursor()
@@ -112,15 +149,46 @@ class MainWindowSlots(Ui_Form):
         pse_con_lstn()
         self.pushButton_EmuPortOpen.clicked.connect(pse_con_lstn)
 
-    # Определяем пользовательский слот
-    def btn_connect_push(self):
-        self.tableWidget.setRowCount(0)
-        self.cmd_list.append("connect COM8 115200 1")
-        self.cmd_list.append("read 0 * 3")
-        self.cmd_list.append("read 0 * 4")
-        return None
+        # Определяем пользовательский слот
+    def signal_search(self, Param = False):
 
-    def slot_slider_moved(self):
+        form = Ui_Dialog()
+        self.win = QDialog()
+        form.setupUi(self.win)
+
+        def connect():
+            self.send_total = 0
+            self.send_err = 0
+            self.tableWidget.setRowCount(0)
+            if form.comboBox_portlist.currentIndex() == 0:
+                port = "*"
+            else:
+                port = form.comboBox_portlist.currentText()
+            speed = "*"
+            try:
+                int(form.comboBox_speedlist.currentText())
+                speed = form.comboBox_speedlist.currentText()
+            except ValueError: pass
+            ID = "*"
+            try:
+                int(form.lineEdit_ID.text())
+                ID = form.lineEdit_ID.text()
+            except ValueError: pass
+            cmd = "connect "+port+" "+speed+" "+ID
+            self.cmd_list.append(cmd)
+            self.cmd_list.append("read 0 * 3")
+            self.cmd_list.append("read 0 * 4")
+            self.win.close()
+            return None
+
+        serials = serial.tools.list_ports.comports()
+        for el in serials: form.comboBox_portlist.addItem(el.device)
+        form.pushButton_CN.clicked.connect(self.win.close)
+        form.pushButton_OK.clicked.connect(connect)
+        if Param: self.win.show()
+        else: connect()
+
+    def signal_slider_moved(self):
         if len(self.srv.devices) == 0: return
         value = int(self.horizontalSlider.value()*self.srv.devices[0].holdings[5]/self.horizontalSlider.maximum())
         self.tableWidget.cellWidget(3, 1).setText(str(value))
@@ -130,7 +198,7 @@ class MainWindowSlots(Ui_Form):
         self.cmd_list.append(req)
         pass
 
-    def slot_slider_changed(self):
+    def signal_slider_changed(self):
         if len(self.cmd_list) > 1: return
         if len(self.srv.devices) == 0: return
         value = int(self.horizontalSlider.value()*self.srv.devices[0].holdings[5]/self.horizontalSlider.maximum())
@@ -140,7 +208,7 @@ class MainWindowSlots(Ui_Form):
         self.tableWidget.cellWidget(3, 1).setText(str(value))
         self.lineEdit_freqref.setText(str(value/10).replace(".", ","))
 
-    def slot_lineedit_freref_pressed(self):
+    def signal_lineedit_freref_pressed(self):
         if len(self.srv.devices) == 0: return
         try:
             tmp = self.lineEdit_freqref.text()
@@ -155,9 +223,9 @@ class MainWindowSlots(Ui_Form):
                 tmp = self.horizontalSlider.maximum() * 10 * tmp/self.srv.devices[0].holdings[5]
             else: tmp = 0
             self.horizontalSlider.setValue(tmp)
-            self.slot_slider_moved()
+            self.signal_slider_moved()
 
-    def slot_lineedit_freqref_changed(self):
+    def signal_lineedit_freqref_changed(self):
         pass
 
 
@@ -167,15 +235,15 @@ class MainWindowSlots(Ui_Form):
             for i in range(self.tableWidget.rowCount()):
                 tmp2 = int(self.tableWidget.cellWidget(i, 1).text())
                 if tmp2 != self.srv.devices[0].holdings[i]:
-                    formatter = "QLineEdit {background-color: Red;}"
+                    formatter = "QLineEdit {background-color: Red; font: 14pt;}"
                     print("Warning: \n"
                           "Cell wrong value adr=", i, " cell=", tmp2, " dev=", self.srv.devices[0].holdings[i])
                     self.tableWidget.cellWidget(i, 1).setText(str(self.srv.devices[0].holdings[i]))
                 else:
                     if i in self.ylwcells:
-                        formatter = "QLineEdit {background-color: LightGreen;}"
+                        formatter = "QLineEdit {background-color: LightGreen; font: 14pt;}"
                     else:
-                        formatter = "QLineEdit {background-color: White;}"
+                        formatter = "QLineEdit {background-color: White; font: 14pt;}"
                 self.tableWidget.cellWidget(i, 1).setStyleSheet(formatter)
             self.ylwcells.clear()
 
@@ -183,14 +251,24 @@ class MainWindowSlots(Ui_Form):
         ##
         # Marking holding table cells tobe checked
         # ##
-        self.tableWidget.cellWidget(row, 1).setStyleSheet("QLineEdit {background-color: yellow;}")
+        self.tableWidget.cellWidget(row, 1).setStyleSheet("QLineEdit {background-color: yellow; font: 14pt;}")
         self.ylwcells.append(row)
 
-    def slot_qtable_contmenu(self):
+    # Table contmenu
+    def signal_qtable_contmenu(self):
+        if len(self.srv.devices) == 0: return
         menu = QMenu()
         act_load_from_dev = menu.addAction("Обновить в программе")
-        act_load_from_dev.triggered.connect(self.slot_act_load_form_dev)
-        # act_load_to_dev = menu.addAction("Обновить на устройстве")
+        act_load_from_dev.triggered.connect(self.action_loadformdev)
+        act_load_to_dev = menu.addAction("Обновить на устройстве")
+
+        def refratdev():
+            for i in range(self.tableWidget.rowCount()-1):
+                req = "write 0 " + str(i) + " " + self.tableWidget.cellWidget(i, 1).text()
+                self.cmd_list.append(req)
+                self.marking_cell(i)
+
+        act_load_to_dev.triggered.connect(refratdev)
         act_save_to_dev = menu.addAction("Сохранить в память МПЧ")
         act_save_to_dev.triggered.connect(lambda: self.cmd_list.append("write 0 0 8"))
         # act_save_to_file = menu.addAction("Сохранить в файл")
@@ -198,13 +276,17 @@ class MainWindowSlots(Ui_Form):
         # act_load_from_default = menu.addAction("Сброс к заводским установкам")
         menu.exec(QCursor.pos())
 
-    def slot_act_load_form_dev(self):
+    def action_loadformdev(self):
         # self.tableWidget.clear()
         # self.tableWidget.setRowCount(0)
         self.cmd_list.append("read 0 * 3")
         self.ylwcells.append(0)
 
     def widget_init(self):
+        # combobox without scrolling
+        class myComboBox(QComboBox):
+            def wheelEvent(self, *args, **kwargs): pass
+
         # holding table refresh
         if self.tableWidget.rowCount() != len(self.srv.devices[0].holdings):
             # print device information
@@ -215,7 +297,7 @@ class MainWindowSlots(Ui_Form):
                 self.jsdtr = json.load(fh)  # загружаем из файла данные в словарь data
             # set table row value
             self.tableWidget.setRowCount(len(self.srv.devices[0].holdings))
-            for x in range(0, len(self.srv.devices[0].holdings)):
+            for x, el in enumerate(self.srv.devices[0].holdings):
                 if x < len(self.jsdtr):
                     # writing parameter name from prm.json data to column 0, 2
                     item = QTableWidgetItem(self.jsdtr[x][0])
@@ -228,7 +310,9 @@ class MainWindowSlots(Ui_Form):
                         tbtn.setMaximumSize(100, 75)
                         tbtn.setText("Задать")
                         self.tableWidget.setCellWidget(x, 3, tbtn)
-                        self.tableWidget.setCellWidget(x, 2, QComboBox())
+                        #combox
+                        cmb = myComboBox()
+                        self.tableWidget.setCellWidget(x, 2, cmb)
                         for item in self.jsdtr[x][1]:
                             # adding item at combobox
                             self.tableWidget.cellWidget(x, 2).addItem(item[0])
@@ -239,7 +323,7 @@ class MainWindowSlots(Ui_Form):
                                 self.tableWidget.cellWidget(x, 2).setCurrentIndex(-1)
 
                             # Combobox index changing event
-                            def item_indCng():
+                            def signal_btnpressed():
                                 try:
                                     # combobox current index
                                     tmp = self.tableWidget.cellWidget(self.tableWidget.currentRow(), 2).currentIndex()
@@ -247,8 +331,6 @@ class MainWindowSlots(Ui_Form):
                                     # holding cell value
                                     tmp2 = int(self.tableWidget.cellWidget(self.tableWidget.currentRow(), 1).text())
                                     if tmp != tmp2:
-                                        # cell value changing
-                                        self.tableWidget.cellWidget(self.tableWidget.currentRow(), 1).setText(str(tmp))
                                         # marking cell
                                         self.marking_cell(self.tableWidget.currentRow())
                                         # request for server to write value
@@ -258,13 +340,18 @@ class MainWindowSlots(Ui_Form):
                                                 tmp = self.jsdtr[self.tableWidget.currentRow()][1][tmp][1]
                                         req = "write 0 " + str(self.tableWidget.currentRow()) + " " + str(tmp)
                                         self.cmd_list.append(req)
+                                        # cell value changing
+                                        self.tableWidget.cellWidget(self.tableWidget.currentRow(), 1).setText(str(tmp))
                                 except AttributeError:
                                     pass
 
                             # connecting event to combobox
                             # self.tableWidget.cellWidget(x, 2).currentIndexChanged.connect(item_indCng)
                             # connecting event to button
-                            self.tableWidget.cellWidget(x, 3).clicked.connect(item_indCng)
+                            self.tableWidget.cellWidget(x, 3).clicked.connect(signal_btnpressed)
+                            tcmbx = QComboBox()
+                            tcmbx.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding, )
+                            self.tableWidget.cellWidget(x, 3).setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
                     # if no additional combobox
                     else:
                         # disabling cell changing at column 2
@@ -280,13 +367,14 @@ class MainWindowSlots(Ui_Form):
                     self.tableWidget.setItem(x, 0, item)
                 # Set cell value at column 1
                 item = QLineEdit(str(self.srv.devices[0].holdings[x]))
-                item.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-                item.setMaximumSize(75, 75)
+                item.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
+                item.setMaxLength(6)
+                item.setMaximumSize(100, 100)
                 # Only int numbers
                 item.setValidator(QIntValidator(-65536, 65536))
 
                 # Cell value changing event
-                def cell_pressed():
+                def signal_cellpressed():
                     try:
                         # cell current value
                         tmp = int(self.tableWidget.cellWidget(self.tableWidget.currentRow(), 1).text())
@@ -303,19 +391,19 @@ class MainWindowSlots(Ui_Form):
                           self.tableWidget.cellWidget(self.tableWidget.currentRow(), 1).text()
                     self.cmd_list.append(req)
 
-                def cell_changed():
+                def signal_cellchanged():
                     try:
                         self.tableWidget.cellWidget(self.tableWidget.currentRow(), 1).setStyleSheet(
-                            "QLineEdit {background-color: Pink;}"
+                            "QLineEdit {background-color: Pink; font: 14pt;}"
                         )
                     except AttributeError:
                         pass
 
                 # connecting event to QLineEdit
-                item.returnPressed.connect(cell_pressed)
-                item.textChanged.connect(cell_changed)
+                item.returnPressed.connect(signal_cellpressed)
+                item.textChanged.connect(signal_cellchanged)
                 self.tableWidget.setCellWidget(x, 1, item)
             # self.tableWidget.setColumnWidth(1,50)
             self.tableWidget.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
             self.tableWidget.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-            self.tableWidget.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+            self.tableWidget.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)

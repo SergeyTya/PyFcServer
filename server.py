@@ -15,6 +15,14 @@ class Server:
     class ServerError(Exception):
         pass
 
+    def __init__(self):
+        self.consol = {"connect": self.connect, "read": self.read_register,
+                       "read_scope": self.read_scope, "devices": self.list_devices,
+                       "rm": self.rm_device, "write": self.write_register, "close": self.con_close
+                       }
+        self.devices = []
+
+
     class Device:
 
         def __init__(self, device, slave_name):
@@ -187,13 +195,6 @@ class Server:
             print("  =",res)
         return True
 
-    def __init__(self):
-        self.consol = {"connect": self.connect, "read": self.read_register,
-                       "read_scope": self.read_scope, "devices": self.list_devices,
-                       "rm": self.rm_device, "write": self.write_register
-                       }
-        self.devices = []
-
     def write_register(self, args):
         """
                 read_register  [device ID] [register number] [value]
@@ -218,11 +219,7 @@ class Server:
         print(args)
         signed = False
         if value < 0: signed = True
-        try:
-            res = self.devices[curdev].device.write_register(addres, value, signed = signed)
-        except termios.error as e:
-            print(e)
-            raise self.ServerError(e.args)
+        res = self.devices[curdev].device.write_register(addres, value, signed = signed)
         req = "read "+str(curdev)+" "+str(addres)+" 3"
         #print("  =",res)
         self.main(inpt=req)
@@ -266,6 +263,11 @@ class Server:
         self.devices.append(tmp)
         print("Device ID: ", req)
         return True
+
+    def con_close(self, args):
+        if len(self.devices) == 0: return
+        for dev in self.devices: dev.device.serial.close
+        self.devices = []
 
     def connect(self, args):
         """
