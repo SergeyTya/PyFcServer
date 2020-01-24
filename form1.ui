@@ -36,15 +36,15 @@
        </font>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>3</number>
       </property>
       <widget class="QWidget" name="page_5">
        <property name="geometry">
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>186</width>
-         <height>383</height>
+         <width>183</width>
+         <height>385</height>
         </rect>
        </property>
        <property name="font">
@@ -309,7 +309,7 @@
          <x>0</x>
          <y>0</y>
          <width>200</width>
-         <height>313</height>
+         <height>310</height>
         </rect>
        </property>
        <property name="font">
@@ -477,7 +477,7 @@
          <x>0</x>
          <y>0</y>
          <width>200</width>
-         <height>313</height>
+         <height>310</height>
         </rect>
        </property>
        <property name="font">
@@ -623,8 +623,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>186</width>
-         <height>418</height>
+         <width>183</width>
+         <height>482</height>
         </rect>
        </property>
        <property name="font">
@@ -637,6 +637,16 @@
         <string>Релейные</string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_3">
+        <item>
+         <widget class="QLabel" name="label_RDIO">
+          <property name="text">
+           <string>Статус</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="lineEdit_RDIO"/>
+        </item>
         <item>
          <widget class="QTableWidget" name="tableWidget_2">
           <property name="minimumSize">
@@ -654,17 +664,17 @@
           <property name="rowCount">
            <number>16</number>
           </property>
-          <attribute name="horizontalHeaderDefaultSectionSize">
-           <number>57</number>
-          </attribute>
           <attribute name="horizontalHeaderMinimumSectionSize">
            <number>48</number>
           </attribute>
-          <attribute name="verticalHeaderDefaultSectionSize">
-           <number>21</number>
+          <attribute name="horizontalHeaderDefaultSectionSize">
+           <number>57</number>
           </attribute>
           <attribute name="verticalHeaderMinimumSectionSize">
            <number>20</number>
+          </attribute>
+          <attribute name="verticalHeaderDefaultSectionSize">
+           <number>21</number>
           </attribute>
           <row>
            <property name="text">
@@ -766,7 +776,7 @@
          <x>0</x>
          <y>0</y>
          <width>200</width>
-         <height>313</height>
+         <height>310</height>
         </rect>
        </property>
        <property name="font">
@@ -785,7 +795,7 @@
          <x>0</x>
          <y>0</y>
          <width>200</width>
-         <height>313</height>
+         <height>310</height>
         </rect>
        </property>
        <property name="font">
@@ -934,11 +944,11 @@
             <attribute name="horizontalHeaderCascadingSectionResizes">
              <bool>true</bool>
             </attribute>
-            <attribute name="horizontalHeaderDefaultSectionSize">
-             <number>150</number>
-            </attribute>
             <attribute name="horizontalHeaderMinimumSectionSize">
              <number>0</number>
+            </attribute>
+            <attribute name="horizontalHeaderDefaultSectionSize">
+             <number>150</number>
             </attribute>
             <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
              <bool>true</bool>
@@ -952,11 +962,11 @@
             <attribute name="verticalHeaderCascadingSectionResizes">
              <bool>false</bool>
             </attribute>
-            <attribute name="verticalHeaderDefaultSectionSize">
-             <number>30</number>
-            </attribute>
             <attribute name="verticalHeaderMinimumSectionSize">
              <number>0</number>
+            </attribute>
+            <attribute name="verticalHeaderDefaultSectionSize">
+             <number>30</number>
             </attribute>
             <attribute name="verticalHeaderStretchLastSection">
              <bool>false</bool>
@@ -1347,7 +1357,7 @@
        </layout>
       </item>
       <item>
-       <layout class="QHBoxLayout" name="horizontalLayout" stretch=""/>
+       <layout class="QHBoxLayout" name="horizontalLayout"/>
       </item>
      </layout>
     </item>
@@ -1359,7 +1369,7 @@
      <x>0</x>
      <y>0</y>
      <width>887</width>
-     <height>24</height>
+     <height>27</height>
     </rect>
    </property>
    <property name="font">
@@ -1383,6 +1393,7 @@
     </property>
     <addaction name="action_search"/>
     <addaction name="action_searchparam"/>
+    <addaction name="action_connection_reset"/>
    </widget>
    <widget class="QMenu" name="menuxc">
     <property name="title">
@@ -1440,6 +1451,11 @@
   <action name="action_5">
    <property name="text">
     <string>Сброс к заводским установкам</string>
+   </property>
+  </action>
+  <action name="action_connection_reset">
+   <property name="text">
+    <string>Сброс</string>
    </property>
   </action>
  </widget>

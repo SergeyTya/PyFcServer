@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import QTableWidgetItem, QWidget, QComboBox, QLineEdit, QMe
     QPushButton, QSizePolicy, QDialog, QInputDialog, QMainWindow
 import json
 import ProdSensEmu
+from chardet.universaldetector import UniversalDetector
 
 # from qtconsole.qt import QtCore, QtGui
 from PyQt5 import QtCore
@@ -36,7 +37,8 @@ class MainWindowSlots(Ui_Form):
 
     def __init__(self):
         self.send_total = 0
-        self.send_err = 0
+        self.send_errttl = 0
+        self.send_errcnt = 0
         self.cmd_list = []
         self.srv = srv.Server()
         self.ylwcells = []
@@ -45,12 +47,16 @@ class MainWindowSlots(Ui_Form):
         self.jsdtr = None
         self.loggers = [0] * 10
         self.jsstatus = []
+        self.pse = None
         try:
-            with open('status.json', 'r') as fh:  # открываем файл на чтение
+            detector = UniversalDetector()
+            with open('status.json', 'r',encoding='Windows-1251') as fh:  # открываем файл на чтение
                 self.jsstatus = json.load(fh)  # загружаем из файла данные в словарь data
+            #with open('status.json', 'r') as fh: self.jsstatus = json.load(fh)
         except (
                 json.decoder.JSONDecodeError,
-                FileNotFoundError
+                FileNotFoundError,
+                UnicodeDecodeError
         ) as e: print(e)
 
     def proc(self):
@@ -62,7 +68,7 @@ class MainWindowSlots(Ui_Form):
                 tmpstbar = self.srv.devices[0].device.serial.port + " " + str(self.srv.devices[0].device.serial.baudrate)+\
                            " Adr "+str(self.srv.devices[0].device.address) +" : " + tmpdvname +\
                            " : status "+ str(hex(self.srv.devices[0].inputs[2]))+\
-                           " : tot=" + str(self.send_total)+ " err=" + str(self.send_err)
+                           " : tot=" + str(self.send_total)+ " err=" + str(self.send_errttl)
         self.statusbar.showMessage(tmpstbar)
 
         # First int
@@ -90,12 +96,14 @@ class MainWindowSlots(Ui_Form):
                 except (
                         KeyError,
                         IndexError
-                ):
-                    str_status2 = str_status
+                ): str_status2 = str_status
+
+                if self.send_errcnt > 10: str_status2 = " нет связи "
                 self.label_DevStatus.setText(str_status2)
 
+
         # prodsens emulator controls
-        if len(self.srv.devices) > 0:
+        if (len(self.srv.devices) > 0) & (self.pse is not None):
             if len(self.srv.devices[0].inputs) > 0:
                 try:
                     tmp = float(self.lineEdit_EmuOut_gain.text())
@@ -106,7 +114,7 @@ class MainWindowSlots(Ui_Form):
                 self.pse.setFreqValue(math.fabs(tmp_vl.value/10))
 
                 #self.lineEdit_EmuOut.setText(str(self.pse.pse_float_value).format("f%2"))
-                #self.lineEdit_EmuOut.setText('{0: >#016.2f}'.format(self.pse.pse_float_value))
+                self.lineEdit_EmuOut.setText('{0: >#016.2f}'.format(self.pse.pse_float_value))
 
         if len(self.srv.devices) > 0:
             if len(self.srv.devices[0].inputs) > 0:
@@ -146,11 +154,11 @@ class MainWindowSlots(Ui_Form):
             self.timer3.timeout.connect(lambda: self.pse.start())
             self.timer3.start(10)
 
-        pse_con_lstn()
+       # pse_con_lstn()
         self.pushButton_EmuPortOpen.clicked.connect(pse_con_lstn)
 
         # Определяем пользовательский слот
-    def signal_search(self, Param = False):
+    def signal_device_search(self, Param = False):
 
         form = Ui_Dialog()
         self.win = QDialog()
@@ -187,6 +195,13 @@ class MainWindowSlots(Ui_Form):
         form.pushButton_OK.clicked.connect(connect)
         if Param: self.win.show()
         else: connect()
+
+    def signal_connection_reset(self):
+        self.srv.brake_request = True
+        if len(self.srv.devices) == 0: return
+        self.tableWidget.setRowCount(0)
+        self.srv.devices[0].device.serial.close()
+        self.srv.devices = []
 
     def signal_slider_moved(self):
         if len(self.srv.devices) == 0: return
@@ -262,13 +277,13 @@ class MainWindowSlots(Ui_Form):
         act_load_from_dev.triggered.connect(self.action_loadformdev)
         act_load_to_dev = menu.addAction("Обновить на устройстве")
 
-        def refratdev():
+        def refresh_holdings_at_dev():
             for i in range(self.tableWidget.rowCount()-1):
                 req = "write 0 " + str(i) + " " + self.tableWidget.cellWidget(i, 1).text()
                 self.cmd_list.append(req)
                 self.marking_cell(i)
 
-        act_load_to_dev.triggered.connect(refratdev)
+        act_load_to_dev.triggered.connect(refresh_holdings_at_dev)
         act_save_to_dev = menu.addAction("Сохранить в память МПЧ")
         act_save_to_dev.triggered.connect(lambda: self.cmd_list.append("write 0 0 8"))
         # act_save_to_file = menu.addAction("Сохранить в файл")
@@ -321,37 +336,37 @@ class MainWindowSlots(Ui_Form):
                                 self.tableWidget.cellWidget(x, 2).setCurrentIndex(self.srv.devices[0].holdings[x])
                             else:
                                 self.tableWidget.cellWidget(x, 2).setCurrentIndex(-1)
+                        #self.tableWidget.cellWidget(x, 2).setFixedWidth(150)
 
-                            # Combobox index changing event
-                            def signal_btnpressed():
-                                try:
-                                    # combobox current index
-                                    tmp = self.tableWidget.cellWidget(self.tableWidget.currentRow(), 2).currentIndex()
-                                    if tmp == -1: return
-                                    # holding cell value
-                                    tmp2 = int(self.tableWidget.cellWidget(self.tableWidget.currentRow(), 1).text())
-                                    if tmp != tmp2:
-                                        # marking cell
-                                        self.marking_cell(self.tableWidget.currentRow())
-                                        # request for server to write value
-                                        if len(self.jsdtr[self.tableWidget.currentRow()]) > 1:
-                                            if len(self.jsdtr[self.tableWidget.currentRow()][1][tmp]) == 2:
-                                                # get cell value from json structure
-                                                tmp = self.jsdtr[self.tableWidget.currentRow()][1][tmp][1]
-                                        req = "write 0 " + str(self.tableWidget.currentRow()) + " " + str(tmp)
-                                        self.cmd_list.append(req)
-                                        # cell value changing
-                                        self.tableWidget.cellWidget(self.tableWidget.currentRow(), 1).setText(str(tmp))
-                                except AttributeError:
-                                    pass
+                        # connecting event to combobox
+                        # self.tableWidget.cellWidget(x, 2).currentIndexChanged.connect(item_indCng)
+                        # connecting event to button
+                        # Combobox index changing event
+                        def signal_btnpressed():
+                            try:
+                                # combobox current index
+                                tmp = self.tableWidget.cellWidget(self.tableWidget.currentRow(), 2).currentIndex()
+                                if tmp == -1: return False
+                                # holding cell value
+                                tmp2 = int(self.tableWidget.cellWidget(self.tableWidget.currentRow(), 1).text())
+                                if tmp != tmp2:
+                                    # marking cell
+                                    self.marking_cell(self.tableWidget.currentRow())
+                                    # request for server to write value
+                                    if len(self.jsdtr[self.tableWidget.currentRow()]) > 1:
+                                        if len(self.jsdtr[self.tableWidget.currentRow()][1][tmp]) == 2:
+                                            # get cell value from json structure
+                                            tmp = self.jsdtr[self.tableWidget.currentRow()][1][tmp][1]
+                                    req = "write 0 " + str(self.tableWidget.currentRow()) + " " + str(tmp)
+                                    self.cmd_list.append(req)
+                                    # cell value changing
+                                    self.tableWidget.cellWidget(self.tableWidget.currentRow(), 1).setText(str(tmp))
+                                return True
+                            except AttributeError:
+                                return False
 
-                            # connecting event to combobox
-                            # self.tableWidget.cellWidget(x, 2).currentIndexChanged.connect(item_indCng)
-                            # connecting event to button
-                            self.tableWidget.cellWidget(x, 3).clicked.connect(signal_btnpressed)
-                            tcmbx = QComboBox()
-                            tcmbx.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding, )
-                            self.tableWidget.cellWidget(x, 3).setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
+                        self.tableWidget.cellWidget(x, 3).clicked.connect(signal_btnpressed)
+                        self.tableWidget.cellWidget(x, 3).setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
                     # if no additional combobox
                     else:
                         # disabling cell changing at column 2
@@ -379,9 +394,10 @@ class MainWindowSlots(Ui_Form):
                         # cell current value
                         tmp = int(self.tableWidget.cellWidget(self.tableWidget.currentRow(), 1).text())
                         # check for combobox item count
-                        if tmp > self.tableWidget.cellWidget(self.tableWidget.currentRow(), 2).count(): tmp = -1
-                        # changing combobox index
-                        self.tableWidget.cellWidget(self.tableWidget.currentRow(), 2).setCurrentIndex(tmp)
+                        if self.tableWidget.cellWidget(self.tableWidget.currentRow(), 2) is not None:
+                            if tmp > self.tableWidget.cellWidget(self.tableWidget.currentRow(), 2).count(): tmp = -1
+                            # changing combobox index
+                            self.tableWidget.cellWidget(self.tableWidget.currentRow(), 2).setCurrentIndex(tmp)
                     except (ValueError, AttributeError) as e:
                         print(e)
                     # marking cell
@@ -396,8 +412,7 @@ class MainWindowSlots(Ui_Form):
                         self.tableWidget.cellWidget(self.tableWidget.currentRow(), 1).setStyleSheet(
                             "QLineEdit {background-color: Pink; font: 14pt;}"
                         )
-                    except AttributeError:
-                        pass
+                    except AttributeError: pass
 
                 # connecting event to QLineEdit
                 item.returnPressed.connect(signal_cellpressed)
@@ -406,4 +421,5 @@ class MainWindowSlots(Ui_Form):
             # self.tableWidget.setColumnWidth(1,50)
             self.tableWidget.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
             self.tableWidget.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+            self.tableWidget.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
             self.tableWidget.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)

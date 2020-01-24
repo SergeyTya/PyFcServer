@@ -5,7 +5,7 @@
 # Импортируем системый модуль для корректного закрытия программы
 import io
 # Импортируем минимальный набор виджетов
-import termios
+#import termios
 
 import minimalmodbus
 import serial
@@ -38,16 +38,16 @@ class MainWindow(QMainWindow, MainWindowSlots):
             self.lineEdit_freq,
             self.lineEdit_vout, self.lineEdit_vbus,
             self.lineEdit_vgrd, self.lineEdit_curr,
-            self.lineEdit_tfrc, self.lineEdit_pmtr,
-            self.lineEdit_tmtr
+            self.lineEdit_tfrc, self.lineEdit_RDIO,
+            self.lineEdit_pmtr, self.lineEdit_tmtr
         ]
 
         self.labels = [
             self.label_freq,
             self.label_vout, self.label_vbus,
             self.label_vgrd, self.label_curr,
-            self.label_tfrc, self.label_pmtr,
-            self.label_tmtr
+            self.label_tfrc, self.lineEdit_RDIO,
+            self.label_pmtr, self.label_tmtr
         ]
         self.loggers = [0] * len(self.indicators)
         # Подключить созданные нами слоты к виджетам
@@ -81,8 +81,9 @@ class MainWindow(QMainWindow, MainWindowSlots):
             el.returnPressed.connect(fo(i))
 
         # menu bar connect
-        self.action_search.triggered.connect(lambda : self.signal_search(Param=False))
-        self.action_searchparam.triggered.connect(lambda: self.signal_search(Param=True))
+        self.action_search.triggered.connect(lambda: self.signal_device_search(Param=False))
+        self.action_searchparam.triggered.connect(lambda: self.signal_device_search(Param=True))
+        self.action_connection_reset.triggered.connect(self.signal_connection_reset)
 
     def closeEvent(self, *args, **kwargs):
         super().close()
@@ -115,13 +116,15 @@ if __name__ == '__main__':
                     while len(self.ui.cmd_list) != 0:
                         try:
                             self.srv.main(inpt=self.ui.cmd_list[0])
-                            self.ui.send_total += 1;
+                            self.ui.send_total += 1
+                            self.ui.send_errcnt = 0
                         except ValueError: pass
                         self.ui.cmd_list.pop(0)
+
                 except (
-                        termios.error,
+                       # termios.error,
                         serial.serialutil.SerialException,
-                        srv.ServerError,
+                        self.srv.ServerError,
                 ) as e:
                     print(e)
                     self.srv.main(inpt="close")
@@ -131,7 +134,9 @@ if __name__ == '__main__':
                     minimalmodbus.InvalidResponseError,
             ) as e:
                 print(e)
-                self.ui.send_err += 1
+                self.ui.send_errttl += 1
+                self.ui.send_errcnt += 1
+                if self.ui.send_errcnt > 10: self.ui.cmd_list.clear()
 
 
     th = ServerProcTread(ui)

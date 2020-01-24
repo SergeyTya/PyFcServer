@@ -21,6 +21,7 @@ class Server:
                        "rm": self.rm_device, "write": self.write_register, "close": self.con_close
                        }
         self.devices = []
+        self.brake_request = False
 
 
     class Device:
@@ -33,6 +34,7 @@ class Server:
             self.scope_maxlen = 10000
             self.scope_fifo = [deque([0] * self.scope_maxlen, maxlen=self.scope_maxlen) for i in range(4)]
             self.scope_timeline = deque([0] * self.scope_maxlen, maxlen=self.scope_maxlen)
+
 
     def help(self):
         print("connect [Port Name] [Port Speed] [Device address] [-a] \n "
@@ -279,7 +281,7 @@ class Server:
         self.devices = []
         serials = serial.tools.list_ports.comports()
         ports = [el.device for el in serials]
-        sids = range(1, 256)
+        sids = range(1, 5)
         alloption = False
         srcoption = False
         try:
@@ -299,6 +301,7 @@ class Server:
             if args[4] == '-s': srcoption = True
         except IndexError:
             pass
+        self.brake_request = False
 
         for port in ports:
             if (alloption is False) & (len(self.devices) != 0): break
@@ -310,10 +313,12 @@ class Server:
                         print("Searching:\n  Port =", port, "\n  Speed =", speed, "\n  Modbus ID =", sid)
                         try:
                             self.create_server(port, speed, sid)
+                            if self.brake_request: return False
+                           # if not self.create_server(port, speed, sid): break;
                         except (
                                 ValueError,
-                                #minimalmodbus.NoResponseError,
-                                #minimalmodbus.InvalidResponseError
+                                minimalmodbus.NoResponseError,
+                                minimalmodbus.InvalidResponseError
                         ) as e:
                             print(e)
 

@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'form1.ui'
 #
-# Created by: PyQt5 UI code generator 5.13.2
+# Created by: PyQt5 UI code generator 5.13.0
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -28,7 +28,7 @@ class Ui_MainWindow(object):
         self.toolBox.setFont(font)
         self.toolBox.setObjectName("toolBox")
         self.page_5 = QtWidgets.QWidget()
-        self.page_5.setGeometry(QtCore.QRect(0, 0, 186, 383))
+        self.page_5.setGeometry(QtCore.QRect(0, 0, 183, 385))
         font = QtGui.QFont()
         font.setPointSize(14)
         font.setUnderline(False)
@@ -150,7 +150,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_5.addLayout(self.verticalLayout_2)
         self.toolBox.addItem(self.page_5, "")
         self.page_6 = QtWidgets.QWidget()
-        self.page_6.setGeometry(QtCore.QRect(0, 0, 200, 313))
+        self.page_6.setGeometry(QtCore.QRect(0, 0, 200, 310))
         font = QtGui.QFont()
         font.setPointSize(14)
         font.setUnderline(False)
@@ -239,7 +239,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_8.addLayout(self.verticalLayout_7)
         self.toolBox.addItem(self.page_6, "")
         self.page_7 = QtWidgets.QWidget()
-        self.page_7.setGeometry(QtCore.QRect(0, 0, 200, 313))
+        self.page_7.setGeometry(QtCore.QRect(0, 0, 200, 310))
         font = QtGui.QFont()
         font.setPointSize(14)
         font.setUnderline(False)
@@ -318,7 +318,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_9.addLayout(self.verticalLayout_4)
         self.toolBox.addItem(self.page_7, "")
         self.page_Signals = QtWidgets.QWidget()
-        self.page_Signals.setGeometry(QtCore.QRect(0, 0, 186, 418))
+        self.page_Signals.setGeometry(QtCore.QRect(0, 0, 183, 482))
         font = QtGui.QFont()
         font.setPointSize(14)
         font.setUnderline(False)
@@ -326,6 +326,12 @@ class Ui_MainWindow(object):
         self.page_Signals.setObjectName("page_Signals")
         self.verticalLayout_3 = QtWidgets.QVBoxLayout(self.page_Signals)
         self.verticalLayout_3.setObjectName("verticalLayout_3")
+        self.label_RDIO = QtWidgets.QLabel(self.page_Signals)
+        self.label_RDIO.setObjectName("label_RDIO")
+        self.verticalLayout_3.addWidget(self.label_RDIO)
+        self.lineEdit_RDIO = QtWidgets.QLineEdit(self.page_Signals)
+        self.lineEdit_RDIO.setObjectName("lineEdit_RDIO")
+        self.verticalLayout_3.addWidget(self.lineEdit_RDIO)
         self.tableWidget_2 = QtWidgets.QTableWidget(self.page_Signals)
         self.tableWidget_2.setMinimumSize(QtCore.QSize(0, 400))
         font = QtGui.QFont()
@@ -378,7 +384,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_3.addWidget(self.tableWidget_2)
         self.toolBox.addItem(self.page_Signals, "")
         self.page_9 = QtWidgets.QWidget()
-        self.page_9.setGeometry(QtCore.QRect(0, 0, 200, 313))
+        self.page_9.setGeometry(QtCore.QRect(0, 0, 200, 310))
         font = QtGui.QFont()
         font.setPointSize(14)
         font.setUnderline(False)
@@ -386,7 +392,7 @@ class Ui_MainWindow(object):
         self.page_9.setObjectName("page_9")
         self.toolBox.addItem(self.page_9, "")
         self.page_8 = QtWidgets.QWidget()
-        self.page_8.setGeometry(QtCore.QRect(0, 0, 200, 313))
+        self.page_8.setGeometry(QtCore.QRect(0, 0, 200, 310))
         font = QtGui.QFont()
         font.setPointSize(12)
         font.setUnderline(False)
@@ -629,7 +635,7 @@ class Ui_MainWindow(object):
         self.horizontalLayout_5.addLayout(self.verticalLayout)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 887, 24))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 887, 27))
         font = QtGui.QFont()
         font.setPointSize(12)
         self.menubar.setFont(font)
@@ -664,8 +670,11 @@ class Ui_MainWindow(object):
         self.action_4.setObjectName("action_4")
         self.action_5 = QtWidgets.QAction(MainWindow)
         self.action_5.setObjectName("action_5")
+        self.action_connection_reset = QtWidgets.QAction(MainWindow)
+        self.action_connection_reset.setObjectName("action_connection_reset")
         self.menu_search.addAction(self.action_search)
         self.menu_search.addAction(self.action_searchparam)
+        self.menu_search.addAction(self.action_connection_reset)
         self.menuxc.addAction(self.action)
         self.menuxc.addAction(self.action_2)
         self.menuxc.addSeparator()
@@ -679,7 +688,7 @@ class Ui_MainWindow(object):
         self.menubar.addAction(self.menu.menuAction())
 
         self.retranslateUi(MainWindow)
-        self.toolBox.setCurrentIndex(0)
+        self.toolBox.setCurrentIndex(3)
         self.tabWidget.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
@@ -709,6 +718,7 @@ class Ui_MainWindow(object):
         self.label_pext.setText(_translate("MainWindow", "Датчик 2"))
         self.lineEdit_pext.setText(_translate("MainWindow", "0"))
         self.toolBox.setItemText(self.toolBox.indexOf(self.page_7), _translate("MainWindow", "Положение"))
+        self.label_RDIO.setText(_translate("MainWindow", "Статус"))
         item = self.tableWidget_2.verticalHeaderItem(0)
         item.setText(_translate("MainWindow", "1"))
         item = self.tableWidget_2.verticalHeaderItem(1)
@@ -780,3 +790,4 @@ class Ui_MainWindow(object):
         self.action_3.setText(_translate("MainWindow", "Загрузить из память МПЧ"))
         self.action_4.setText(_translate("MainWindow", "Загрузить из файла"))
         self.action_5.setText(_translate("MainWindow", "Сброс к заводским установкам"))
+        self.action_connection_reset.setText(_translate("MainWindow", "Сброс"))

@@ -102,15 +102,13 @@ class ProdSensEmu(QThread):
             tmp.xonxoff = False  # disable software flow control
             tmp.rtscts = False  # disable hardware (RTS/CTS) flow control
             tmp.dsrdtr = False  # disable hardware (DSR/DTR) flow control
-            #tmp.set_buffer_size(rx_size = 256 , tx_size = 256)
             tmp.writeTimeout = 2
-            tmp.open()
+            if not tmp.is_open: tmp.open()
             self.port = tmp
             self.freq = 0.0
             self.gain = 0.15
             self.pse_float_value = 0.0
             self.cerr = 0
-
             self.logger = LogerGraf.LoggerWindow(title="Production sensor value", update_time=10)
 
             print("Production sens emulator started: ")
@@ -131,6 +129,7 @@ class ProdSensEmu(QThread):
             self.logger.logValue(self.pse_float_value)
         # 8 byte request
             cnt = self.port.in_waiting
+
             if cnt >= 8:
                 res = self.port.read_all()
                 # if list(map(hex,  self.getcrc(res[0:6]))) == list(map(hex, res[6:8])):
@@ -145,8 +144,10 @@ class ProdSensEmu(QThread):
             # counting error
             else:
                 self.cerr += 1
-                if self.cerr > 500: self.cerr = 0
-                print("PSE - connection timeout")
+                if self.cerr > 500:
+                    self.cerr = 0
+                    print("PSE - connection timeout")
+
         except serial.serialutil.SerialException as e:
             print(e)
             self.connect = False

@@ -22,11 +22,20 @@ class LoggerWindow(QMainWindow):
         self.setWindowTitle(title)
         max_x = 10000
         self.log = [deque([0] * max_x, maxlen=max_x), deque([0] * max_x, maxlen=max_x)]
-        self.log[0].extend(range(0, max_x))
+        t0 = 0
+        period = 1
+
+        rng = range(0, max_x)
+        rng = map(lambda x: t0 + x * period * 0.001, rng)
+
+       # self.log[0].extend(range(0, max_x))
+        self.log[0].extend(rng)
         self.gnr = self.gen(len(self.log[0]))
         self.timer = QTimer()
         self.timer.timeout.connect(self.updater)
         self.timer.start(update_time)
+
+
 
     def updater(self):
         if self.isHidden(): return
